@@ -11,7 +11,7 @@ void pow_a(int *a, int *b, int n, int m, int comm_sz /* 总进程数 */) {
         for (int j = 0; j < m; j++) {
             x *= a[i];
         }
-        b[i] = a[i];
+        b[i] = x;
     }
 }
 

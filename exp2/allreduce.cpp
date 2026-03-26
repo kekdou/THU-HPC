@@ -10,11 +10,33 @@
 
 namespace ch = std::chrono;
 
-void Ring_Allreduce(void* sendbuf, void* recvbuf, int n, MPI_Comm comm, int comm_sz, int my_rank)
-{
-    //TODO
+void Ring_Allreduce(void* sendbuf, void* recvbuf, int n, MPI_Comm comm, int comm_sz, int my_rank) {
+    float* src = static_cast<float*>(sendbuf);
+    float* dst = static_cast<float*>(recvbuf);
+    int block_size = n / comm_sz;
+    int send_rank = (my_rank + 1) % comm_sz;
+    int recv_rank = (my_rank - 1 + comm_sz) % comm_sz;
+    memcpy(dst, src, n * sizeof(float));
+    float temp[block_size];
+    MPI_Request reqs[2];
+    for (int i = 0; i < comm_sz - 1; i++) {
+        int send_offset = (my_rank - i + comm_sz) % comm_sz * block_size;
+        int recv_offset = (my_rank - i - 1 + comm_sz) % comm_sz * block_size;
+        MPI_Irecv(temp, block_size, MPI_FLOAT, recv_rank, 0, comm, &reqs[0]);
+        MPI_Isend(dst + send_offset, block_size, MPI_FLOAT, send_rank, 0, comm, &reqs[1]);
+        MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+        for (int j = 0; j < block_size; ++j) {
+            dst[recv_offset + j] += temp[j];
+        }
+    }
+    for (int i = 0; i < comm_sz - 1; ++i) {
+        int send_offset = (my_rank - i + 1 + comm_sz) % comm_sz * block_size;
+        int recv_offset = (my_rank - i + comm_sz) % comm_sz * block_size;
+        MPI_Irecv(dst + recv_offset, block_size, MPI_FLOAT, recv_rank, 0, comm, &reqs[0]);
+        MPI_Isend(dst + send_offset, block_size, MPI_FLOAT, send_rank, 0, comm, &reqs[1]);
+        MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    }
 }
-
 
 // reduce + bcast
 void Naive_Allreduce(void* sendbuf, void* recvbuf, int n, MPI_Comm comm, int comm_sz, int my_rank)

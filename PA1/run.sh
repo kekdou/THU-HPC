@@ -26,4 +26,4 @@ else
 fi
 
 # run on 1 machine * 28 process, feel free to change it!
-srun -N $N -n $n --cpu-bind sockets --exclusive $*
+srun -N $N -n $n --cpu-bind=sockets --exclusive $*

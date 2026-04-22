@@ -58,7 +58,11 @@ void Worker::sort() {
     if (neighbor >= 0 && neighbor < active_procs) {
       size_t neighbor_len = (neighbor == active_procs - 1) ? (n - neighbor * b_size) : b_size;
       float my_pivot, recv_pivot;
-      my_pivot = (rank < neighbor) ? src[block_len - 1] : src[0];
+      if (rank < neighbor) {
+          my_pivot = src[block_len - 1];
+      } else {
+          my_pivot = src[0];
+      }
       MPI_Sendrecv(&my_pivot, 1, MPI_FLOAT, neighbor, 0,
                    &recv_pivot, 1, MPI_FLOAT, neighbor, 0,
                    MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -73,25 +77,25 @@ void Worker::sort() {
         }
       }
       if (need_exchange) {
-        MPI_Sendrecv(src, block_len, MPI_FLOAT, neighbor, 1,
-                     recv_data, neighbor_len, MPI_FLOAT, neighbor, 1,
+        MPI_Sendrecv(src, block_len, MPI_FLOAT, neighbor, 1, 
+                     recv_data, neighbor_len, MPI_FLOAT, neighbor, 1, 
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         if (rank < neighbor) {
-          size_t low = (block_len > neighbor_len) ? (block_len - neighbor_len) : 0;
-          size_t high = block_len;
-          while (low < high) {
-            size_t mid = (low + high + 1) >> 1;
-            size_t j_idx = block_len - mid;
-            float a_left = (mid == 0) ? -1e38f : src[mid - 1];
-            float b_right = (j_idx == neighbor_len) ? 1e38f : recv_data[j_idx];
-            if (a_left <= b_right) {
-              low = mid;
+          size_t left = (block_len > neighbor_len) ? (block_len - neighbor_len) : 0;
+          size_t right = block_len;
+          while (left < right) {
+            size_t mid = (left + right + 1) >> 1;
+            size_t j_index = block_len - mid;
+            float i_val = (mid == 0) ? -1e38f : src[mid - 1];
+            float j_val = (j_index == neighbor_len) ? 1e38f : recv_data[j_index];
+            if (i_val <= j_val) {
+              left = mid;
             } else {
-              high = mid - 1;
+              right = mid - 1;
             }
           }
-          size_t i_len = low;
-          size_t j_len = block_len - low;
+          size_t i_len = left;
+          size_t j_len = block_len - left;
           size_t i = 0, j = 0, k = 0;
           while (i < i_len && j < j_len) {
             if (src[i] <= recv_data[j]) {
@@ -103,23 +107,21 @@ void Worker::sort() {
           while (i < i_len) dst[k++] = src[i++];
           while (j < j_len) dst[k++] = recv_data[j++];
         } else {
-          size_t low = 0;
-          size_t high = std::min(block_len, neighbor_len);
-          while (low < high) {
-            size_t mid = (low + high + 1) >> 1;
-            size_t j_idx = neighbor_len - mid;
-            float a_left = (mid == 0) ? -1e38f : src[mid - 1];
-            float b_right = (j_idx == neighbor_len) ? 1e38f : recv_data[j_idx];
-            if (a_left <= b_right) {
-              low = mid;
+          size_t left = 0;
+          size_t right = std::min(block_len, neighbor_len);
+          while (left < right) {
+            size_t mid = (left + right + 1) >> 1;
+            size_t j_index = neighbor_len - mid;
+            float i_val = (mid == 0) ? -1e38f : src[mid - 1];
+            float j_val = (j_index == neighbor_len) ? 1e38f : recv_data[j_index];
+            if (i_val <= j_val) {
+              left = mid;
             } else {
-              high = mid - 1;
+              right = mid - 1;
             }
           }
-          size_t drop_i = low;
-          size_t drop_j = neighbor_len - low;
-          size_t i = drop_i;
-          size_t j = drop_j;
+          size_t i = left;
+          size_t j = neighbor_len - left;
           size_t k = 0;
           while (i < block_len && j < neighbor_len) {
             if (src[i] <= recv_data[j]) {
